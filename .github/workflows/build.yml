@@ -1,40 +1,41 @@
-name: Build PotatoAuth
+package dev.potatoauth;
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.network.chat.Component;
+import com.mojang.blaze3d.platform.InputConstants;
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+public class PotatoAuthClient implements ClientModInitializer {
+    private static KeyMapping openMenuKey;
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    @Override
+    public void onInitializeClient() {
+        KeyMapping.Category category =
+            KeyMapping.Category.register(
+                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(
+                    "potatoauth", "main"
+                )
+            );
 
-      - name: Extract project
-        run: |
-          unzip PotatoAuth-Fabric-26.2-source.zip -d extracted
-          sed -i 's/modImplementation/implementation/g' extracted/PotatoAuth/build.gradle
+        openMenuKey = KeyMappingHelper.registerKeyMapping(
+            new KeyMapping(
+                "key.potatoauth.open_menu",
+                InputConstants.Type.KEYSYM,
+                InputConstants.KEY_RIGHT_SHIFT,
+                category
+            )
+        );
 
-      - name: Set up Java 25
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.5.1'
-
-      - name: Build mod
-        working-directory: extracted/PotatoAuth
-        run: gradle build
-
-      - name: Upload JAR
-        uses: actions/upload-artifact@v4
-        with:
-          name: PotatoAuth-JAR
-          path: extracted/PotatoAuth/build/libs/*.jar
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            while (openMenuKey.consumeClick()) {
+                if (client.player != null) {
+                    client.player.sendSystemMessage(
+                        Component.literal("§5PotatoAuth §7is running!")
+                    );
+                }
+            }
+        });
+    }
+}
